@@ -181,8 +181,15 @@ def converges(population):
 def genetic_algorithm(population, food_map_file_name, generations, selection_strategy, pool_size, crossover_probability, crossover_strategy, mutation_probability, replacement_strategy, replacement_factor):
     stats = []
     food_map, map_size = get_map(food_map_file_name)
+    convergence_stats = []
 
     for generation in range(generations):
+        # check for stagnation
+        if converges(population): 
+            return max_fitness, max_individual, max_trial, stats, population
+        else:
+            convergence_stats.append((len(set(population)), len(set(population)) / len(population)))
+
         # step 2: evaluate the fitness of each chromosome
         fitnesses = []
         trials = []
@@ -203,11 +210,8 @@ def genetic_algorithm(population, food_map_file_name, generations, selection_str
 
         # step 4: merge populations into a new poulation
         population = replace(population, child_population, fitnesses, replacement_strategy, replacement_factor)
-        
-        if converges(population): 
-            return max_fitness, max_individual, max_trial, stats, population
 
-    return max_fitness, max_individual, max_trial, stats, population
+    return max_fitness, max_individual, max_trial, stats, population, convergence_stats
 
 
 def initialize_population(num_population):
@@ -429,7 +433,7 @@ if __name__ == "__main__":
     population = initialize_population(population_size)
     display_population(population, "initial_population.txt", food_map_file_name)
 
-    max_fitness, max_individual, max_trial, stats, population = genetic_algorithm(population, food_map_file_name, generations, selection_strategy, pool_size, crossover_probability, crossover_strategy, mutation_probability, replacement_strategy, replacement_factor)
+    max_fitness, max_individual, max_trial, stats, population, convergence_stats = genetic_algorithm(population, food_map_file_name, generations, selection_strategy, pool_size, crossover_probability, crossover_strategy, mutation_probability, replacement_strategy, replacement_factor)
 
     display_trials(max_trial, "max_trial.txt")
     display_population(population, "final_population.txt", food_map_file_name)
@@ -466,6 +470,20 @@ if __name__ == "__main__":
     plt.savefig("fitness of last generation on muir and santa fe map.png")
 
     plt.figure(3)
+    plt.plot([i for i in range(generations)], [i[0] for i in convergence_stats], marker = "o", color = "blue")
+    plt.xlabel("generation")
+    plt.xlim((0, generations))
+    plt.ylim((0, max(i[0] for i in convergence_stats) + 10))
+    plt.ylabel("unique individuals")
+    plt.savefig("unique individuals.png")
+
+    plt.figure(3)
+    plt.plot([i for i in range(generations)], [i[1] for i in convergence_stats], marker = "o", color = "green")
+    plt.xlabel("generation")
+    plt.xlim((0, generations))
+    plt.ylim((0, 1))
+    plt.ylabel("convergence ratio")
+    plt.savefig("convergence ratios.png")
 
     # Example of how to use get_map, ant_simulator and display trials function
     """
