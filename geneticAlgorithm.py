@@ -7,10 +7,15 @@
 # You are required to finish the genetic_algorithm function, and you may need to complete crossover, mutate and select.
 
 import random
-import sys
 import argparse
 import matplotlib.pyplot as plt
 
+# Source: https://stackoverflow.com/questions/12116685/how-can-i-require-my-python-scripts-argument-to-be-a-float-between-0-0-1-0-usin
+def probability(x):
+    x = float(x)
+    if x < 0.0 or x > 1.0:
+        raise argparse.ArgumentTypeError("%r not in range [0.0, 1.0]"%(x,))
+    return x
 
 def rank_selection(population, fitnesses, pool_size):
     parent_population = []
@@ -42,6 +47,7 @@ def roulette_selection(population, fitnesses, pool_size):
 def greedy_selection(population, fitnesses, pool_size):
     parent_population = []
     fitnesses = sorted(fitnesses, key=lambda t: t[0])
+    fitnesses.reverse()
     for parent in range(pool_size):
         parent_population.append(population[fitnesses[parent][1]])
     return parent_population
@@ -75,7 +81,7 @@ def uniform_crossover(parent1, parent2, crossover_probability):
         _current_parent = parent1
     child1 = ""
     child2 = ""
-    for i in range(min(len(parent1), len(parent2))):
+    for gene in range(min(len(parent1), len(parent2))):
         if random.random() <= crossover_probability:
             if current_parent == parent1:
                 current_parent = parent2
@@ -83,8 +89,8 @@ def uniform_crossover(parent1, parent2, crossover_probability):
             else:
                 current_parent = parent1
                 _current_parent = parent2
-        child1 += current_parent[i]
-        child2 += _current_parent[i]
+        child1 += current_parent[gene]
+        child2 += _current_parent[gene]
     return (child1, child2)
 
 
@@ -92,22 +98,23 @@ def crossover(parent_population, crossover_probability, crossover_strategy):
     child_population = []
     for parent1 in parent_population:
         for parent2 in parent_population:
-            child1, child2 = crossover_strategy(parent1, parent2, crossover_probability)
-            child_population.append(child1)
-            child_population.append(child2)
+            if parent1 != parent2:
+                child1, child2 = crossover_strategy(parent1, parent2, crossover_probability)
+                child_population.append(child1)
+                child_population.append(child2)
     return child_population
 
 
 def mutate(individual, mutation_probability):
     mutated = ""
-    for index, chromosome in enumerate(individual):
+    for index, gene in enumerate(individual):
         if random.random() <= mutation_probability:
             if index % 3:
                 mutated += str(random.randint(0, 9))
             else:
                 mutated += str(random.randint(1, 4))
         else:
-            mutated += chromosome
+            mutated += gene
     return mutated
 
 
@@ -164,6 +171,13 @@ def replace(old_population, child_population, fitnesses, replacement_strategy, r
     return replacement_strategy(old_population, child_population, fitnesses, replacement_factor)
 
 
+def converges(population):
+    for individual in range(len(population)):
+        if population[individual] != population[0]:
+            return False
+    return True
+
+
 def genetic_algorithm(population, food_map_file_name, generations, selection_strategy, pool_size, crossover_probability, crossover_strategy, mutation_probability, replacement_strategy, replacement_factor):
     stats = []
     food_map, map_size = get_map(food_map_file_name)
@@ -189,6 +203,9 @@ def genetic_algorithm(population, food_map_file_name, generations, selection_str
 
         # step 4: merge populations into a new poulation
         population = replace(population, child_population, fitnesses, replacement_strategy, replacement_factor)
+        
+        if converges(population): 
+            return max_fitness, max_individual, max_trial, stats, population
 
     return max_fitness, max_individual, max_trial, stats, population
 
@@ -331,6 +348,17 @@ def display_trials(trials, target_file):
     trial_file.close()
 
 
+def display_population(population, target_file, food_map_file_name):
+    food_map, map_size = get_map(food_map_file_name)
+    population_file = open(target_file, "w")
+    for individual in population:
+        fitness = ant_simulator(food_map, map_size, individual)[1]
+        population_file.write("individual: %s" % (individual))
+        population_file.write("\t|\t")
+        population_file.write("fitness: %d" % (fitness))
+        population_file.write("\n")
+    population_file.close()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a genetic algorithm")
     parser.add_argument("-m", "--map", type=str, 
@@ -341,16 +369,16 @@ if __name__ == "__main__":
                         help="specify the number of generations", default=40)
     parser.add_argument("-ps", "--pool-size", type=int,
                         help="specify the number of parents to generate", default=10)
-    parser.add_argument("-s", "--selection-strategy", type=str, choices=["rank_selection", "roulette_selection", "greedy_selection"],
-                        help="specify the selection strategy to use", default="rank_selection")
-    parser.add_argument("-cp", "--crossover-probability", type=float,
-                        help="specify the probability of crossover for each parent pair", default=0.5)
-    parser.add_argument("-c", "--crossover-strategy", type=str, choices=["single_point_crossover", "two_point_crossover", "uniform_crossover"],
-                        help="specify the crossover strategy to use", default="uniform_crossover")
-    parser.add_argument("-mp", "--mutation-probability", type=float,
+    parser.add_argument("-s", "--selection-strategy", type=str, choices=["rank", "roulette", "greedy"],
+                        help="specify the selection strategy to use", default="rank")
+    parser.add_argument("-cp", "--crossover-probability", type=probability,
+                        help="specify the probability of crossover for each parent pair", default=0.1)
+    parser.add_argument("-c", "--crossover-strategy", type=str, choices=["single", "dual", "uniform"],
+                        help="specify the crossover strategy to use", default="uniform")
+    parser.add_argument("-mp", "--mutation-probability", type=probability,
                         help="specify the probability of mutation for each child", default=0.05)
-    parser.add_argument("-r", "--replacement-strategy", type=str, choices=["generational_replacement", "overlapping_replacement", "elitist_replacement", "random_replacement"],
-                        help="specify the replacement strategy to use", default="elitist_replacement")
+    parser.add_argument("-r", "--replacement-strategy", type=str, choices=["generational", "overlapping", "elitist", "random"],
+                        help="specify the replacement strategy to use", default="elitist")
     parser.add_argument("-rf", "--replacement-factor", type=int,
                         help="specify the number of individuals to replace/keep for overlapping/elitist selection", default=3)
     args = parser.parse_args()
@@ -363,41 +391,59 @@ if __name__ == "__main__":
     mutation_probability = args.mutation_probability
     replacement_factor = args.replacement_factor
 
-    if args.selection_strategy == "rank_selection":
+    if args.selection_strategy == "rank":
         selection_strategy = rank_selection
-    elif args.selection_strategy == "roulette_selection":
+    elif args.selection_strategy == "roulette":
         selection_strategy = roulette_selection
-    elif args.selection_strategy == "greedy_selection":
+    elif args.selection_strategy == "greedy":
         selection_strategy = greedy_selection
 
-    if args.crossover_strategy == "single_point_crossover":
+    if args.crossover_strategy == "single":
         crossover_strategy = single_point_crossover
-    elif args.crossover_strategy == "two_point_crossover":
+    elif args.crossover_strategy == "dual":
         crossover_strategy = two_point_crossover
-    elif args.crossover_strategy == "uniform_crossover":
+    elif args.crossover_strategy == "uniform":
         crossover_strategy = uniform_crossover
 
-    if args.replacement_strategy == "generational_replacement":
+    if args.replacement_strategy == "generational":
         replacement_strategy = generational_replacement
-    elif args.replacement_strategy == "overlapping_replacement":
+    elif args.replacement_strategy == "overlapping":
         replacement_strategy = overlapping_replacement
-    elif args.replacement_strategy == "elitist_replacement":
+    elif args.replacement_strategy == "elitist":
         replacement_strategy = elitist_replacement
-    elif args.replacement_strategy == "random_replacement":
+    elif args.replacement_strategy == "random":
         replacement_strategy = random_replacement
 
+    if population_size < 0:
+        raise Exception("population_size (%r) must be a positive number" % (population_size))
+
+    if generations < 0:
+        raise Exception("generations (%r) must be a positive number" % (generations))
+
+    if pool_size > population_size:
+        raise Exception("pool size (%r) cannot exceed population_size (%r)" % (pool_size, population_size))
+
+    if (selection_strategy == elitist_replacement or selection_strategy == overlapping_replacement) and replacement_factor > population_size:
+        raise Exception("replacement_factor (%r) cannot exceed population_size (%r)" % (replacement_factor, population_size))
+
     population = initialize_population(population_size)
+    display_population(population, "initial_population.txt", food_map_file_name)
+
     max_fitness, max_individual, max_trial, stats, population = genetic_algorithm(population, food_map_file_name, generations, selection_strategy, pool_size, crossover_probability, crossover_strategy, mutation_probability, replacement_strategy, replacement_factor)
 
     display_trials(max_trial, "max_trial.txt")
+    display_population(population, "final_population.txt", food_map_file_name)
 
     plt.figure(1)
-    plt.plot([i for i in range(len(stats))], [i[0] for i in stats], marker = "o")
+    plt.plot([i for i in range(len(stats))], [i[0] for i in stats], marker = "o", color = "green", label = "most fit individual")
+    plt.plot([i for i in range(len(stats))], [i[1] for i in stats], marker = "o", color = "red", label = "least fit individual")
+    plt.plot([i for i in range(len(stats))], [i[2] for i in stats], marker = "o", color = "blue", label = "average fitness")
     plt.xlabel("generation")
-    plt.xlim((0, 200))
+    plt.xlim((0, generations))
     plt.ylim((0, max(i[0] for i in stats) + 10))
-    plt.ylabel("most fit individual")
-    plt.savefig("max fitness of each generation.png")
+    plt.ylabel("fitness")
+    plt.legend()
+    plt.savefig("fitness of each generation.png")
 
     plt.figure(2)
     muir_fitness = []
@@ -410,14 +456,16 @@ if __name__ == "__main__":
         muir_fitness.append(individual_muir_fitness)
         santafe_fitness.append(individual_santafe_fitness)
 
-    plt.plot([i for i in range(len(muir_fitness))], muir_fitness, marker = "o", color = "blue", label = "muir")
-    plt.plot([i for i in range(len(santafe_fitness))], santafe_fitness, marker = "o", color = "green", label = "santa fe")
+    plt.plot([i for i in range(len(muir_fitness))], muir_fitness, marker = "o", color = "blue", label = "muir", linestyle = "None")
+    plt.plot([i for i in range(len(santafe_fitness))], santafe_fitness, marker = "o", color = "green", label = "santa fe", linestyle = "None")
     plt.xlabel("individuals in the last generation")
     plt.xlim((0, population_size))
     plt.ylim((0, max(muir_fitness + santafe_fitness) + 10))
     plt.ylabel("fitness")
     plt.legend()
     plt.savefig("fitness of last generation on muir and santa fe map.png")
+
+    plt.figure(3)
 
     # Example of how to use get_map, ant_simulator and display trials function
     """
