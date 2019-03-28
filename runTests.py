@@ -108,15 +108,13 @@ if __name__ == "__main__":
         output.close()
         if args.clean:
             subprocess.call(["rm", os.path.join("runs", batch, "_result")])
+            subprocess.call(["mkdir", os.path.join("runs", batch, "data")])
             for i in range(args.n):
-                if i != max_run:
-                    command = ["rm", "-rf"]
-                    command.append(os.path.join("runs", batch, str(i)))
-                    subprocess.call(command)
-                else:
+                if i == max_run:
                     for file in glob.glob(os.path.join("runs", batch, str(i), "*")):
-                        command = ["mv", file, os.path.join(
+                        command = ["cp", file, os.path.join(
                             "runs", batch, file.split('/')[-1])]
                         subprocess.call(command)
-                    command = ["rmdir", os.path.join("runs", batch, str(i))]
-                    subprocess.call(command)
+                command = ["mv", os.path.join("runs", batch, str(
+                        i)), os.path.join("runs", batch, "data")]
+                subprocess.call(command)
