@@ -8,14 +8,18 @@
 
 import random
 import argparse
+import os
 import matplotlib.pyplot as plt
 
 # Source: https://stackoverflow.com/questions/12116685/how-can-i-require-my-python-scripts-argument-to-be-a-float-between-0-0-1-0-usin
+
+
 def probability(x):
     x = float(x)
     if x < 0.0 or x > 1.0:
-        raise argparse.ArgumentTypeError("%r not in range [0.0, 1.0]"%(x,))
+        raise argparse.ArgumentTypeError("%r not in range [0.0, 1.0]" % (x,))
     return x
+
 
 def rank_selection(population, fitnesses, pool_size):
     parent_population = []
@@ -99,7 +103,8 @@ def crossover(parent_population, crossover_probability, crossover_strategy):
     for parent1 in parent_population:
         for parent2 in parent_population:
             if parent1 != parent2:
-                child1, child2 = crossover_strategy(parent1, parent2, crossover_probability)
+                child1, child2 = crossover_strategy(
+                    parent1, parent2, crossover_probability)
                 child_population.append(child1)
                 child_population.append(child2)
     return child_population
@@ -121,9 +126,14 @@ def mutate(individual, mutation_probability):
 def generational_replacement(old_population, child_population, fitnesses, *args):
     new_population = []
     for chromosome in range(len(old_population)):
+        if len(child_population) == 0:
+            break
         r = random.randint(0, len(child_population) - 1)
         new_population.append(child_population[r])
-        # child_population.pop(r)
+    # default if new generation is too small
+    for chromosome in range(len(new_population), len(old_population)):
+        r = random.randint(0, len(old_population) - 1)
+        new_population.append(old_population[r])
     return new_population
 
 
@@ -136,9 +146,14 @@ def overlapping_replacement(old_population, child_population, fitnesses, culling
     for chromosome in old_population:
         new_population.append(chromosome)
     for chromosome in range(culling_factor):
+        if len(child_population) == 0:
+            break
         r = random.randint(0, len(child_population) - 1)
         new_population.append(child_population[r])
-        # child_population.pop(r)
+    # default if new generation is too small
+    for chromosome in range(len(new_population), len(old_population)):
+        r = random.randint(0, len(old_population) - 1)
+        new_population.append(old_population[r])
     return new_population
 
 
@@ -149,21 +164,26 @@ def elitist_replacement(old_population, child_population, fitnesses, elitism_fac
         new_population.append(old_population[max_fitness[1]])
         fitnesses.pop(fitnesses.index(max_fitness))
     for chromosome in range(elitism_factor, len(old_population)):
+        if len(child_population) == 0:
+            break
         r = random.randint(0, len(child_population) - 1)
         new_population.append(child_population[r])
-        # child_population.pop(r)
+    # default if new generation is too small
+    for chromosome in range(len(new_population), len(old_population)):
+        r = random.randint(0, len(old_population) - 1)
+        new_population.append(old_population[r])
     return new_population
 
 
 def random_replacement(old_population, child_population, fitnesses, *args):
     new_population = []
     for i in range(len(old_population)):
-        if random.random() <= 0.5:
+        # default if new generation is too small
+        if random.random() <= 0.5 and len(child_population) > 0:
             new_population.append(old_population[i])
         else:
             r = random.randint(0, len(child_population) - 1)
             new_population.append(child_population[r])
-            # child_population.pop(r)
     return new_population
 
 
@@ -334,7 +354,7 @@ def get_map(file_name):
     return food_map, [int(i) for i in map_size]
 
 
-def display_trials(trials, target_file):
+def display_trials(trials, output_path, target_file):
     """
     parameters:
         trials: a list of list of strings, representing the trials
@@ -345,16 +365,16 @@ def display_trials(trials, target_file):
 
     It takes in the trials, and target_file, and saved the trials in the target_file. You can open the target_file to take a look at the ant's trial.
     """
-    trial_file = open(target_file, "w")
+    trial_file = open(os.path.join(output_path, target_file), "w")
     for line in trials:
         trial_file.write(" ".join(line))
         trial_file.write("\n")
     trial_file.close()
 
 
-def display_population(population, target_file, food_map_file_name):
+def display_population(population, output_path, target_file, food_map_file_name):
     food_map, map_size = get_map(food_map_file_name)
-    population_file = open(target_file, "w")
+    population_file = open(os.path.join(output_path, target_file), "w")
     for individual in population:
         fitness = ant_simulator(food_map, map_size, individual)[1]
         population_file.write("individual: %s" % (individual))
@@ -385,6 +405,8 @@ if __name__ == "__main__":
                         help="specify the replacement strategy to use", default="elitist")
     parser.add_argument("-rf", "--replacement-factor", type=int,
                         help="specify the number of individuals to replace/keep for overlapping/elitist selection", default=3)
+    parser.add_argument("-o", "--output", type=str,
+                        help="specify the full path to the directory into which to redirect the output", default="./runs/")
     args = parser.parse_args()
 
     food_map_file_name = args.map
@@ -430,13 +452,19 @@ if __name__ == "__main__":
     if (selection_strategy == elitist_replacement or selection_strategy == overlapping_replacement) and replacement_factor > population_size:
         raise Exception("replacement_factor (%r) cannot exceed population_size (%r)" % (replacement_factor, population_size))
 
+    output_path = ""
+    if not os.path.isdir(args.output):
+        raise Exception("output directory (%r) does not exist" % (args.output))
+    else: 
+        output_path = args.output
+
     population = initialize_population(population_size)
-    display_population(population, "initial_population.txt", food_map_file_name)
+    display_population(population, output_path, "initial_population.txt", food_map_file_name)
 
     max_fitness, max_individual, max_trial, stats, population, convergence_stats = genetic_algorithm(population, food_map_file_name, generations, selection_strategy, pool_size, crossover_probability, crossover_strategy, mutation_probability, replacement_strategy, replacement_factor)
 
-    display_trials(max_trial, "max_trial.txt")
-    display_population(population, "final_population.txt", food_map_file_name)
+    display_trials(max_trial, output_path, "max_trial.txt")
+    display_population(population, output_path, "final_population.txt", food_map_file_name)
 
     plt.figure(1)
     plt.plot([i for i in range(len(stats))], [i[0] for i in stats], marker = "o", color = "green", label = "most fit individual")
@@ -447,7 +475,7 @@ if __name__ == "__main__":
     plt.ylim((0, max(i[0] for i in stats) + 10))
     plt.ylabel("fitness")
     plt.legend()
-    plt.savefig("fitness of each generation.png")
+    plt.savefig(os.path.join(output_path, "fitness of each generation.png"))
 
     plt.figure(2)
     muir_fitness = []
@@ -467,7 +495,7 @@ if __name__ == "__main__":
     plt.ylim((0, max(muir_fitness + santafe_fitness) + 10))
     plt.ylabel("fitness")
     plt.legend()
-    plt.savefig("fitness of last generation on muir and santa fe map.png")
+    plt.savefig(os.path.join(output_path, "fitness of last generation on muir and santa fe map.png"))
 
     plt.figure(3)
     plt.plot([i for i in range(generations)], [i[0] for i in convergence_stats], marker = "o", color = "blue")
@@ -475,7 +503,7 @@ if __name__ == "__main__":
     plt.xlim((0, generations))
     plt.ylim((0, max(i[0] for i in convergence_stats) + 10))
     plt.ylabel("unique individuals")
-    plt.savefig("unique individuals.png")
+    plt.savefig(os.path.join(output_path, "unique individuals.png"))
 
     plt.figure(3)
     plt.plot([i for i in range(generations)], [i[1] for i in convergence_stats], marker = "o", color = "green")
@@ -483,7 +511,7 @@ if __name__ == "__main__":
     plt.xlim((0, generations))
     plt.ylim((0, 1))
     plt.ylabel("convergence ratio")
-    plt.savefig("convergence ratios.png")
+    plt.savefig(os.path.join(output_path, "convergence ratios.png"))
 
     # Example of how to use get_map, ant_simulator and display trials function
     """
