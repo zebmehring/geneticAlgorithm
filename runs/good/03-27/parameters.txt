@@ -1,1 +1,0 @@
-geneticAlgorithm.py -p 500 -ps 10 -cp 0.6 -mp 0.1 -s rank -c uniform  -r elitist -g 40

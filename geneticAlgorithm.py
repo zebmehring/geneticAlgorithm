@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
 
-# Please feel free to modify any part of the code or add any functions, or modify the argument of the given functions. But please keep the name of the given functions
-
-# Please feel free to import any libraries you need.
-
-# You are required to finish the genetic_algorithm function, and you may need to complete crossover, mutate and select.
-
 import random
 import argparse
 import os
