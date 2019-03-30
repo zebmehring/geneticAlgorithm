@@ -11,9 +11,8 @@ import argparse
 import os
 import matplotlib.pyplot as plt
 
+
 # Source: https://stackoverflow.com/questions/12116685/how-can-i-require-my-python-scripts-argument-to-be-a-float-between-0-0-1-0-usin
-
-
 def probability(x):
     x = float(x)
     if x < 0.0 or x > 1.0:
@@ -102,11 +101,9 @@ def crossover(parent_population, crossover_probability, crossover_strategy):
     child_population = []
     for parent1 in parent_population:
         for parent2 in parent_population:
-            if parent1 != parent2:
-                child1, child2 = crossover_strategy(
-                    parent1, parent2, crossover_probability)
-                child_population.append(child1)
-                child_population.append(child2)
+            child1, child2 = crossover_strategy(parent1, parent2, crossover_probability)
+            child_population.append(child1)
+            child_population.append(child2)
     return child_population
 
 
@@ -126,14 +123,8 @@ def mutate(individual, mutation_probability):
 def generational_replacement(old_population, child_population, fitnesses, *args):
     new_population = []
     for chromosome in range(len(old_population)):
-        if len(child_population) == 0:
-            break
         r = random.randint(0, len(child_population) - 1)
         new_population.append(child_population[r])
-    # default if new generation is too small
-    for chromosome in range(len(new_population), len(old_population)):
-        r = random.randint(0, len(old_population) - 1)
-        new_population.append(old_population[r])
     return new_population
 
 
@@ -141,19 +132,12 @@ def overlapping_replacement(old_population, child_population, fitnesses, culling
     new_population = []
     for chromosome in range(culling_factor):
         min_fitness = min(fitnesses, key=lambda t: t[0])
-        old_population.pop(min_fitness[1])
         fitnesses.pop(fitnesses.index(min_fitness))
-    for chromosome in old_population:
-        new_population.append(chromosome)
+    for fitness, index in fitnesses:
+        new_population.append(old_population[index])
     for chromosome in range(culling_factor):
-        if len(child_population) == 0:
-            break
         r = random.randint(0, len(child_population) - 1)
         new_population.append(child_population[r])
-    # default if new generation is too small
-    for chromosome in range(len(new_population), len(old_population)):
-        r = random.randint(0, len(old_population) - 1)
-        new_population.append(old_population[r])
     return new_population
 
 
@@ -164,22 +148,15 @@ def elitist_replacement(old_population, child_population, fitnesses, elitism_fac
         new_population.append(old_population[max_fitness[1]])
         fitnesses.pop(fitnesses.index(max_fitness))
     for chromosome in range(elitism_factor, len(old_population)):
-        if len(child_population) == 0:
-            break
         r = random.randint(0, len(child_population) - 1)
         new_population.append(child_population[r])
-    # default if new generation is too small
-    for chromosome in range(len(new_population), len(old_population)):
-        r = random.randint(0, len(old_population) - 1)
-        new_population.append(old_population[r])
     return new_population
 
 
 def random_replacement(old_population, child_population, fitnesses, *args):
     new_population = []
     for i in range(len(old_population)):
-        # default if new generation is too small
-        if random.random() <= 0.5 and len(child_population) > 0:
+        if random.random() <= 0.5 or len(child_population) < 1:
             new_population.append(old_population[i])
         else:
             r = random.randint(0, len(child_population) - 1)
@@ -205,22 +182,14 @@ def genetic_algorithm(population, food_map_file_name, generations, selection_str
 
     for generation in range(generations):
         # check for stagnation
-        if converges(population): 
-            return max_fitness, max_individual, max_trial, stats, population
-        else:
-            convergence_stats.append((len(set(population)), len(set(population)) / len(population)))
+        convergence_stats.append((len(set(population)), len(set(population)) / len(population)))
 
         # step 2: evaluate the fitness of each chromosome
         fitnesses = []
-        trials = []
         for index, individual in enumerate(population):
             trial, fitness = ant_simulator(food_map, map_size, individual)
             fitnesses.append((fitness, index))
-            trials.append(trial)
         stats.append((max(fitnesses, key=lambda t: t[0])[0], min(fitnesses, key=lambda t: t[0])[0], sum(map(lambda t: t[0], fitnesses)) / len(population)))
-        max_fitness, max_index = max(fitnesses, key=lambda t: t[0])
-        max_individual = population[max_index]
-        max_trial = trials[max_index]
 
         # step 3: create a new population
         parent_population = select(population, fitnesses, pool_size, selection_strategy)
@@ -231,6 +200,18 @@ def genetic_algorithm(population, food_map_file_name, generations, selection_str
         # step 4: merge populations into a new poulation
         population = replace(population, child_population, fitnesses, replacement_strategy, replacement_factor)
 
+    fitnesses = []
+    trials = []
+    for index, individual in enumerate(population):
+        trial, fitness = ant_simulator(food_map, map_size, individual)
+        fitnesses.append((fitness, index))
+        trials.append(trial)
+    max_fitness, max_index = max(fitnesses, key=lambda t: t[0])
+    min_fitness, min_index = min(fitnesses, key=lambda t: t[0])
+    total_fitness = sum(map(lambda t: t[0], fitnesses))
+    stats.append((max_fitness, min_fitness, total_fitness / len(population)))
+    max_individual = population[max_index]
+    max_trial = trials[max_index]
     return max_fitness, max_individual, max_trial, stats, population, convergence_stats
 
 
@@ -498,7 +479,7 @@ if __name__ == "__main__":
     plt.savefig(os.path.join(output_path, "fitness of last generation on muir and santa fe map.png"))
 
     plt.figure(3)
-    plt.plot([i for i in range(generations)], [i[0] for i in convergence_stats], marker = "o", color = "blue")
+    plt.plot([i for i in range(len(convergence_stats))], [i[0] for i in convergence_stats], marker = "o", color = "blue")
     plt.xlabel("generation")
     plt.xlim((0, generations))
     plt.ylim((0, max(i[0] for i in convergence_stats) + 10))
@@ -506,7 +487,7 @@ if __name__ == "__main__":
     plt.savefig(os.path.join(output_path, "unique individuals.png"))
 
     plt.figure(3)
-    plt.plot([i for i in range(generations)], [i[1] for i in convergence_stats], marker = "o", color = "green")
+    plt.plot([i for i in range(len(convergence_stats))], [i[1] for i in convergence_stats], marker = "o", color = "green")
     plt.xlabel("generation")
     plt.xlim((0, generations))
     plt.ylim((0, 1))
