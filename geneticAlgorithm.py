@@ -91,6 +91,22 @@ def greedy_selection(population, fitnesses, pool_size):
     return parent_population
 
 
+def random_selection(population, fitnesses, pool_size):
+    """
+    parameters:
+        population: a list of ant genes
+        fitnesses: a list of (f, i) tuples which gives the fitness of the individual at index i
+        pool_size: the number of parents to select
+
+    Choose pool_size parents from population according to random selection.
+    """
+    parent_population = []
+    for parent in range(pool_size):
+        r = random.randint(0, len(population) - 1)
+        parent_population.append(population[r])
+    return parent_population
+
+
 def select(population, fitnesses, pool_size, selection_strategy):
     """
     parameters:
@@ -198,15 +214,15 @@ def mutate(individual, mutation_probability):
     Mutate each of the individual's genes with mutation_probability.
     """
     mutated = ""
-    for index, gene in enumerate(individual):
+    for triplet in range(len(individual) // 3):
         # muatate each gene with probability mutation_probability
         if random.random() <= mutation_probability:
-            if index % 3:
-                mutated += str(random.randint(0, 9))
-            else:
-                mutated += str(random.randint(1, 4))
+            mutated += str(random.randint(1, 4))
+            mutated += str(random.randint(0, 9))
+            mutated += str(random.randint(0, 9))
         else:
-            mutated += gene
+            start = triplet * 3
+            mutated += individual[start:start + 3]
     return mutated
 
 
@@ -351,8 +367,8 @@ def genetic_algorithm(population, food_map_file_name, generations, selection_str
         # step 3: create a new population
         parent_population = select(population, fitnesses, pool_size, selection_strategy)
         child_population = crossover(parent_population, crossover_probability, crossover_strategy)
-        for child in child_population:
-            child = mutate(child, mutation_probability)
+        for index, child in enumerate(child_population):
+            child_population[index] = mutate(child, mutation_probability)
 
         # step 4: merge populations into a new poulation
         population = replace(population, child_population, fitnesses, replacement_strategy, replacement_factor)
@@ -541,7 +557,7 @@ if __name__ == "__main__":
                         help="specify the number of generations", default=40)
     parser.add_argument("-ps", "--pool-size", type=int,
                         help="specify the number of parents to generate", default=10)
-    parser.add_argument("-s", "--selection-strategy", type=str, choices=["rank", "roulette", "greedy"],
+    parser.add_argument("-s", "--selection-strategy", type=str, choices=["rank", "roulette", "greedy", "random"],
                         help="specify the selection strategy to use", default="rank")
     parser.add_argument("-cp", "--crossover-probability", type=probability,
                         help="specify the probability of crossover for each parent pair", default=0.1)
@@ -571,6 +587,8 @@ if __name__ == "__main__":
         selection_strategy = roulette_selection
     elif args.selection_strategy == "greedy":
         selection_strategy = greedy_selection
+    elif args.selection_strategy == "random":
+        selection_strategy = random_selection
 
     if args.crossover_strategy == "single":
         crossover_strategy = single_point_crossover

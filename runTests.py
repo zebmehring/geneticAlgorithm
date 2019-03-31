@@ -59,15 +59,15 @@ if __name__ == "__main__":
     parser.add_argument("-g", "--generations", type=int, default=40)
     parser.add_argument("-ps", "--pool-size", type=int, default=10)
     parser.add_argument("-s", "--selection-strategy", type=str,
-                        choices=["rank", "roulette", "greedy"], default="rank")
+                        choices=["rank", "roulette", "greedy", "random"], default="rank")
     parser.add_argument("-cp", "--crossover-probability",
                         type=probability, default=0.1)
     parser.add_argument("-c", "--crossover-strategy", type=str,
                         choices=["single", "dual", "uniform"], default="uniform")
     parser.add_argument("-mp", "--mutation-probability",
                         type=probability, default=0.05)
-    parser.add_argument("-r", "--replacement-strategy", type=str, choices=[
-                        "generational", "overlapping", "elitist", "random"], default="elitist")
+    parser.add_argument("-r", "--replacement-strategy", type=str,
+                        choices=["generational", "overlapping", "elitist", "random"], default="elitist")
     parser.add_argument("-rf", "--replacement-factor", type=int, default=3)
     args = parser.parse_args()
 
@@ -116,5 +116,5 @@ if __name__ == "__main__":
                             "runs", batch, file.split('/')[-1])]
                         subprocess.call(command)
                 command = ["mv", os.path.join("runs", batch, str(
-                        i)), os.path.join("runs", batch, "data")]
+                    i)), os.path.join("runs", batch, "data")]
                 subprocess.call(command)
