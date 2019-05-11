@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import argparse
 import os
 import subprocess
@@ -30,6 +32,7 @@ def run_tests(batch, n, program, args):
 
 def parse_results(batch, n):
     best_run, best_fitness = (-1, -1)
+    total_max_fitness = 0
     for i in range(n):
         current_run = os.path.join(os.path.join(
             "runs", batch, str(i), "final_population.txt"))
@@ -46,7 +49,9 @@ def parse_results(batch, n):
         if max_fitness > best_fitness:
             best_fitness = max_fitness
             best_run = i
-    return best_run, best_fitness
+        total_max_fitness += max_fitness
+    average_max_fitness = total_max_fitness / n
+    return best_run, best_fitness, average_max_fitness
 
 
 if __name__ == "__main__":
@@ -71,7 +76,8 @@ if __name__ == "__main__":
     parser.add_argument("-rf", "--replacement-factor", type=int, default=3)
     args = parser.parse_args()
 
-    batch = str(datetime.datetime.now()).replace(' ', '|')
+    batch = str(datetime.datetime.now()).split('.')[
+        0].replace(' ', '|').replace(':', '.')
 
     arg_list = []
     arg_list.append("-m")
@@ -102,19 +108,19 @@ if __name__ == "__main__":
     output.close()
 
     if args.parse:
-        max_run, max_fitness = parse_results(batch, args.n)
+        max_run, max_fitness, average_fitness = parse_results(batch, args.n)
         output = open(os.path.join("runs", batch, "_result"), "w")
-        output.write("maximum fitness %d on run %d" % (max_fitness, max_run))
+        output.write("maximum fitness %d on run %d\n" % (max_fitness, max_run))
+        output.write("average maximum fitness %d" % (average_fitness))
         output.close()
-        if args.clean:
-            subprocess.call(["rm", os.path.join("runs", batch, "_result")])
-            subprocess.call(["mkdir", os.path.join("runs", batch, "data")])
-            for i in range(args.n):
-                if i == max_run:
-                    for file in glob.glob(os.path.join("runs", batch, str(i), "*")):
-                        command = ["cp", file, os.path.join(
-                            "runs", batch, file.split('/')[-1])]
-                        subprocess.call(command)
-                command = ["mv", os.path.join("runs", batch, str(
-                    i)), os.path.join("runs", batch, "data")]
-                subprocess.call(command)
+    if args.clean:
+        subprocess.call(["mkdir", os.path.join("runs", batch, "data")])
+        for i in range(args.n):
+            if i == max_run:
+                for file in glob.glob(os.path.join("runs", batch, str(i), "*")):
+                    command = ["cp", file, os.path.join(
+                        "runs", batch, file.split('/')[-1])]
+                    subprocess.call(command)
+            command = ["mv", os.path.join("runs", batch, str(
+                i)), os.path.join("runs", batch, "data")]
+            subprocess.call(command)

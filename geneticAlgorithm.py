@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#! /usr/bin/env python3
 
 import random
 import argparse
@@ -12,15 +12,6 @@ def probability(x):
     if x < 0.0 or x > 1.0:
         raise argparse.ArgumentTypeError("%r not in range [0.0, 1.0]" % (x,))
     return x
-
-
-def converges(population):
-    for individual in range(len(population)):
-        if population[individual] != population[0]:
-            # there exists two unique individuals
-            return False
-    # all individuals are the same
-    return True
 
 
 def rank_selection(population, fitnesses, pool_size):
@@ -105,19 +96,6 @@ def random_selection(population, fitnesses, pool_size):
         r = random.randint(0, len(population) - 1)
         parent_population.append(population[r])
     return parent_population
-
-
-def select(population, fitnesses, pool_size, selection_strategy):
-    """
-    parameters:
-        population: a list of ant genes
-        fitnesses: a list of (f, i) tuples which gives the fitness of the individual at index i
-        pool_size: the number of parents to select
-        selection_strategy: the selection strategy to use ([rank, roulette, greedy])
-
-    Wrapper selection function.
-    """
-    return selection_strategy(population, fitnesses, pool_size)
 
 
 def single_point_crossover(parent1, parent2):
@@ -214,15 +192,15 @@ def mutate(individual, mutation_probability):
     Mutate each of the individual's genes with mutation_probability.
     """
     mutated = ""
-    for triplet in range(len(individual) // 3):
+    for index, gene in enumerate(individual):
         # muatate each gene with probability mutation_probability
         if random.random() <= mutation_probability:
-            mutated += str(random.randint(1, 4))
-            mutated += str(random.randint(0, 9))
-            mutated += str(random.randint(0, 9))
+            if index % 3:
+                mutated += str(random.randint(0, 9))
+            else:
+                mutated += str(random.randint(1, 4))
         else:
-            start = triplet * 3
-            mutated += individual[start:start + 3]
+            mutated += gene
     return mutated
 
 
@@ -311,33 +289,19 @@ def random_replacement(old_population, child_population, fitnesses, *args):
     return new_population
 
 
-def replace(old_population, child_population, fitnesses, replacement_strategy, replacement_factor):
-    """
-    parameters:
-        old_population: a list of ant genes
-        child_population: a list of ant genes
-        fitnesses: a list of (f, i) tuples which gives the fitness of the individual at index i
-        replacement_strategy: the replacement strategy to use ([generational, overlapping, elitist, random])
-        replacement_factor: the number of individuals to remove/keep for overlapping/elitist selection
-
-    Wrapper replacement function.
-    """
-    return replacement_strategy(old_population, child_population, fitnesses, replacement_factor)
-
-
-def genetic_algorithm(population, food_map_file_name, generations, selection_strategy, pool_size, crossover_probability, crossover_strategy, mutation_probability, replacement_strategy, replacement_factor):
+def genetic_algorithm(population, food_map_file_name, generations, pool_size, selection_strategy, crossover_probability, crossover_strategy, mutation_probability, replacement_factor, replacement_strategy):
     """
     parameters:
         population: the initial population (list of ant genes)
         food_map_file_name: the file name from which to read in the food map
         generations: the number of generations to evolve
-        selection_strategy: the selection strategy to use ([rank, roulette, greedy])
         pool_size: the number of parents to generate for each generation
+        selection_strategy: the strategy to use for selecting parents
         crossover_probability: normalized probability to perform crossover between two parents
-        crossover_strategy: the crossover strategy to use ([single, dual, uniform])
+        crossover_strategy: the strategy to use for crossover
         mutation_probability: normalized probability to mutate a single gene
-        replacement_strategy: the replacement strategy to use ([generational, overlapping, elitist, random])
         replacement_factor: the number of individuals to remove/keep for overlapping/elitist selection
+        replacement_strategy: the strategy to use for replacing the population
 
     Run a genetic algorithm to evolve fit ants. For a specified number of generations, do:
         1. evaluate the fitness of each individual in the population
@@ -351,11 +315,11 @@ def genetic_algorithm(population, food_map_file_name, generations, selection_str
     """
     stats = []
     food_map, map_size = get_map(food_map_file_name)
-    convergence_stats = []
+    uniqueness = []
 
     for generation in range(generations):
         # track population uniquenesss
-        convergence_stats.append((len(set(population)), len(set(population)) / len(population)))
+        uniqueness.append(len(set(population)))
 
         # step 2: evaluate the fitness of each chromosome
         fitnesses = []
@@ -365,13 +329,13 @@ def genetic_algorithm(population, food_map_file_name, generations, selection_str
         stats.append((max(fitnesses, key=lambda t: t[0])[0], min(fitnesses, key=lambda t: t[0])[0], sum(map(lambda t: t[0], fitnesses)) / len(population)))
 
         # step 3: create a new population
-        parent_population = select(population, fitnesses, pool_size, selection_strategy)
+        parent_population = selection_strategy(population, fitnesses, pool_size)
         child_population = crossover(parent_population, crossover_probability, crossover_strategy)
         for index, child in enumerate(child_population):
             child_population[index] = mutate(child, mutation_probability)
 
         # step 4: merge populations into a new poulation
-        population = replace(population, child_population, fitnesses, replacement_strategy, replacement_factor)
+        population = replacement_strategy(population, child_population, fitnesses, replacement_factor)
 
     fitnesses = []
     trials = []
@@ -388,7 +352,7 @@ def genetic_algorithm(population, food_map_file_name, generations, selection_str
     max_individual = population[max_index]
     max_trial = trials[max_index]
 
-    return max_fitness, max_individual, max_trial, stats, population, convergence_stats
+    return max_fitness, max_individual, max_trial, stats, population, uniqueness
 
 
 def initialize_population(num_population):
@@ -627,7 +591,7 @@ if __name__ == "__main__":
     population = initialize_population(population_size)
     display_population(population, output_path, "initial_population.txt", food_map_file_name)
 
-    max_fitness, max_individual, max_trial, stats, population, convergence_stats = genetic_algorithm(population, food_map_file_name, generations, selection_strategy, pool_size, crossover_probability, crossover_strategy, mutation_probability, replacement_strategy, replacement_factor)
+    max_fitness, max_individual, max_trial, stats, population, uniqueness = genetic_algorithm(population, food_map_file_name, generations, pool_size, selection_strategy, crossover_probability, crossover_strategy, mutation_probability, replacement_factor, replacement_strategy)
 
     display_trials(max_trial, output_path, "max_trial.txt")
     display_population(population, output_path, "final_population.txt", food_map_file_name)
@@ -642,7 +606,7 @@ if __name__ == "__main__":
     plt.ylim((0, max(i[0] for i in stats) + 10))
     plt.ylabel("fitness")
     plt.legend()
-    plt.savefig(os.path.join(output_path, "fitness of each generation.png"))
+    plt.savefig(os.path.join(output_path, "fitness.png"))
 
     # plot the fitness of the last generation on two different maps
     plt.figure(2)
@@ -657,35 +621,18 @@ if __name__ == "__main__":
         santafe_fitness.append(individual_santafe_fitness)
     plt.plot([i for i in range(len(muir_fitness))], muir_fitness, marker = "o", color = "blue", label = "muir", linestyle = "None")
     plt.plot([i for i in range(len(santafe_fitness))], santafe_fitness, marker = "o", color = "green", label = "santa fe", linestyle = "None")
-    plt.xlabel("individuals in the last generation")
+    plt.xlabel("individual in the last generation")
     plt.xlim((0, population_size))
     plt.ylim((0, max(muir_fitness + santafe_fitness) + 10))
     plt.ylabel("fitness")
     plt.legend()
-    plt.savefig(os.path.join(output_path, "fitness of last generation on muir and santa fe map.png"))
+    plt.savefig(os.path.join(output_path, "muir_vs_santa_fe.png"))
 
     # plot the number of unique individuals at each generation
     plt.figure(3)
-    plt.plot([i for i in range(len(convergence_stats))], [i[0] for i in convergence_stats], marker = "o", color = "blue")
+    plt.plot([i for i in range(len(uniqueness))], uniqueness, marker = "o", color = "blue")
     plt.xlabel("generation")
     plt.xlim((0, generations))
-    plt.ylim((0, max(i[0] for i in convergence_stats) + 10))
+    plt.ylim((0, max(uniqueness) + 10))
     plt.ylabel("unique individuals")
-    plt.savefig(os.path.join(output_path, "unique individuals.png"))
-
-    # plot the number of unique individuals divided by the total number of individuals at each generation
-    plt.figure(4)
-    plt.plot([i for i in range(len(convergence_stats))], [i[1] for i in convergence_stats], marker = "o", color = "green")
-    plt.xlabel("generation")
-    plt.xlim((0, generations))
-    plt.ylim((0, 1))
-    plt.ylabel("convergence ratio")
-    plt.savefig(os.path.join(output_path, "convergence ratios.png"))
-
-    # Example of how to use get_map, ant_simulator and display trials function
-    """
-    food_map, map_size = get_map("muir.txt")
-    ant_genes = "335149249494173115455311387263"
-    trial, fitness = ant_simulator(food_map, map_size, ant_genes)
-    display_trials(trial, "trial.txt")
-    """
+    plt.savefig(os.path.join(output_path, "unique_individuals.png"))
