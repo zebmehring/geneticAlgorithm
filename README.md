@@ -19,7 +19,7 @@ At each timestep, an ant executes two actions based on the value of the current 
 Ants evolve via a genetic algorithm parameterized by values specified on the command line. For information on how to indicate them, simply run `python3 geneticAlgorithm.py [-h|--help]`.
 
 ### Genetic Algorithm
-My genetic algorithm operates according the following procedure. Gor each generation:
+My genetic algorithm operates according the following procedure. For each generation:
 1. Compute the fitness of each individual in the generation.
 1. Create a new population.
     1. Select a pool of parents using the specified selection strategy.
